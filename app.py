@@ -87,7 +87,6 @@ class InventoryAudit(Base):
     timestamp = Column(DateTime, default=now)
 
 Base.metadata.create_all(engine)
-
 # --- Create default admin if not exists ---
 def create_default_admin():
     sess = Session()
