@@ -87,6 +87,43 @@ class InventoryAudit(Base):
     timestamp = Column(DateTime, default=now)
 
 Base.metadata.create_all(engine)
+
+# ---------------- Utilities: password hashing & user helpers ----------------
+
+def generate_salt():
+    return os.urandom(8).hex()
+
+def hash_password(password: str, salt: str):
+    to_hash = (salt + password).encode('utf-8')
+    h = hashlib.sha256(to_hash).hexdigest()
+    return f"{salt}${h}"
+
+def verify_password(stored_hash: str, password: str) -> bool:
+    try:
+        salt, h = stored_hash.split('$')
+    except Exception:
+        return False
+    return hash_password(password, salt) == stored_hash
+
+def create_user(username, password, role, name=None):
+    if not username or not password or not role:
+        return False, "Username, password and role are required"
+    sess = Session()
+    try:
+        if sess.query(User).filter_by(username=username).first():
+            return False, "Username already exists"
+        salt = generate_salt()
+        ph = hash_password(password, salt)
+        user = User(username=username, password_hash=ph, role=role, name=name or username, active=True)
+        sess.add(user)
+        sess.commit()
+        return True, "User created"
+    except Exception as e:
+        sess.rollback()
+        return False, f"DB error: {e}"
+    finally:
+        sess.close()
+
 # --- Create default admin if not exists ---
 def create_default_admin():
     sess = Session()
@@ -106,44 +143,6 @@ def create_default_admin():
     sess.close()
 
 create_default_admin()
-
-# ---------------- Utilities: password hashing & user helpers ----------------
-
-def generate_salt():
-    return os.urandom(8).hex()
-
-def hash_password(password: str, salt: str):
-    # simple sha256(salt + password)
-    to_hash = (salt + password).encode('utf-8')
-    h = hashlib.sha256(to_hash).hexdigest()
-    return f"{salt}${h}"
-
-def verify_password(stored_hash: str, password: str) -> bool:
-    try:
-        salt, h = stored_hash.split('$')
-    except Exception:
-        return False
-    return hash_password(password, salt) == stored_hash
-
-def create_user(username, password, role, name=None):
-    # basic validation
-    if not username or not password or not role:
-        return False, "Username, password and role are required"
-    sess = Session()
-    try:
-        if sess.query(User).filter_by(username=username).first():
-            return False, "Username already exists"
-        salt = generate_salt()
-        ph = hash_password(password, salt)
-        user = User(username=username, password_hash=ph, role=role, name=name or username, active=True)
-        sess.add(user)
-        sess.commit()
-        return True, "User created"
-    except Exception as e:
-        sess.rollback()
-        return False, f"DB error: {e}"
-    finally:
-        sess.close()
 
 
 # ---------------- Inventory helpers ----------------
