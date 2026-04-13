@@ -88,6 +88,26 @@ class InventoryAudit(Base):
 
 Base.metadata.create_all(engine)
 
+# --- Create default admin if not exists ---
+def create_default_admin():
+    sess = Session()
+    existing = sess.query(User).filter_by(username="admin").first()
+    if not existing:
+        salt = generate_salt()
+        ph = hash_password("admin123", salt)
+        admin = User(
+            username="admin",
+            password_hash=ph,
+            role="Admin",
+            name="Administrator",
+            active=True
+        )
+        sess.add(admin)
+        sess.commit()
+    sess.close()
+
+create_default_admin()
+
 # ---------------- Utilities: password hashing & user helpers ----------------
 
 def generate_salt():
